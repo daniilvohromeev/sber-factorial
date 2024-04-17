@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  sber-factorial:
+    build: .
+    ports:
+      - "8099:8099"
+    environment:
+      - CACHE_TYPE=${CACHE_TYPE:-caffeine}
+      - CACHE_SIZE=${CACHE_SIZE:-100}
+      - SIZE_FACTORIAL=${SIZE_FACTORIAL:-100}
+      - CACHE_TIME=${CACHE_TIME:-3600}
+      - CACHE_NAME=${CACHE_NAME:-factorials}
+    restart: always

@@ -1,11 +1,14 @@
 package org.main.sberfactorial.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.main.sberfactorial.configuration.properties.FactorialProperties;
+import org.main.sberfactorial.exception.CacheInvalidException;
+import org.main.sberfactorial.exception.InvalidFactorialArgumentException;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
+import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
@@ -14,44 +17,38 @@ import java.util.logging.Logger;
 @Service
 public class DefaultFactorialService implements FactorialService {
     private static final Logger logger = Logger.getLogger(DefaultFactorialService.class.getName());
-
     private final CacheManager cacheManager;
+    private final FactorialProperties properties;
 
-    @Value("${spring.factorial.max-value}")
-    private int max;
-
-    public DefaultFactorialService(CacheManager cacheManager) {
+    public DefaultFactorialService(CacheManager cacheManager, FactorialProperties properties) {
         this.cacheManager = cacheManager;
+        this.properties = properties;
     }
 
     @Override
     public BigInteger calculateFactorial(int number) {
         logger.info("Вычисление факториала для числа: " + number);
-
-        if (number < 0 || number > max) {
+        if (number < 0 || number > properties.getMaxValue()) {
             logger.severe("Попытка вычислить факториал для недопустимого числа.");
-            throw new IllegalArgumentException("Число должно быть между 0 и " + max);
+            throw new InvalidFactorialArgumentException("Число должно быть между 0 и " + properties.getMaxValue());
         }
 
-        Cache cache = cacheManager.getCache("factorials");
-        if (cache == null) {
-            logger.severe("Кэш не доступен");
-            return null;
-        }
+        return Optional.ofNullable(cacheManager.getCache(properties.getCacheName()))
+                .map(cache -> calculateCachedFactorial(cache, number))
+                .orElseThrow(() -> new CacheInvalidException("Кэш не существует"));
+    }
 
-        // Пытаемся извлечь значение факториала из кэша если он есть просто вернем
-        BigInteger cachedFactorial = cache.get(number, BigInteger.class);
-        if (cachedFactorial != null) {
-            logger.info("Факториал числа " + number + " найден в кэше");
-            return cachedFactorial;
-        }
+    private BigInteger calculateCachedFactorial(Cache cache, int number) {
+        return Optional.ofNullable(cache.get(number, BigInteger.class))
+                .orElseGet(() -> computeAndCacheFactorial(cache, number));
+    }
 
-        BigInteger factorial = BigInteger.ONE;
+    private BigInteger computeAndCacheFactorial(Cache cache, int number) {
         int start = 1;
+        BigInteger factorial = BigInteger.ONE;
 
-        // Находим ближайший факториал к запрашиваемому числу
-        for (int i = number - 1; i > 0; i--) {
-            cachedFactorial = cache.get(i, BigInteger.class);
+        for (int i = number - 1; i >= 1; i--) {
+            BigInteger cachedFactorial = cache.get(i, BigInteger.class);
             if (cachedFactorial != null) {
                 factorial = cachedFactorial;
                 start = i + 1;
@@ -59,12 +56,10 @@ public class DefaultFactorialService implements FactorialService {
             }
         }
 
-        // вычисляем от ближайшего известного числа если такое имеется
         for (int i = start; i <= number; i++) {
             factorial = factorial.multiply(BigInteger.valueOf(i));
-            cache.put(i, factorial); // Кэшируем новые вычисления
+            cache.put(i, factorial);
         }
-
         logger.info("Факториал числа " + number + " вычислен");
         return factorial;
     }

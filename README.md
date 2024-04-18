@@ -27,3 +27,8 @@
 1. Клонировать репозиторий:
    ```bash
    git clone https://github.com/yourusername/factorial-service.git
+2. Запустить приложение:
+   ```bash
+   docker compose -f docker-compose.yml up                                                          
+
+

@@ -1,27 +1,23 @@
 package org.main.sberfactorial.configuration;
 
+import com.github.benmanes.caffeine.cache.CacheLoader;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.annotation.Nullable;
+import org.main.sberfactorial.component.FactorialCacheLoader;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
+import java.math.BigInteger;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Конфигурационный класс для настройки менеджера кэша Caffeine.
- * <p>
- * Этот класс отвечает за создание и настройку {@link CaffeineCacheManager}, который используется
- * для кэширования объектов в приложении. Конфигурация включает параметры времени жизни записей после записи
- * и максимального размера кэша.
- * <p>
- */
 @Configuration
+@EnableCaching
 public class CaffeineCacheConfig {
-    private static final Logger log = LoggerFactory.getLogger(CaffeineCacheConfig.class);
 
     @Value("${factorial.cache-time}")
     private long expireAfterWriteSeconds;
@@ -29,8 +25,26 @@ public class CaffeineCacheConfig {
     @Value("${factorial.cache-size}")
     private long maximumSize;
 
-    @Value("${factorial.cache-name}")
-    private String[] cacheNames;
+    @Value("${factorial.cache-names}")
+    private List<String> cacheNames;
+
+    private final FactorialCacheLoader factorialCacheLoader;
+
+    public CaffeineCacheConfig(@Nullable FactorialCacheLoader factorialCacheLoader) {
+        this.factorialCacheLoader = factorialCacheLoader;
+    }
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        cacheManager.setCacheNames(cacheNames);
+        cacheManager.setCaffeine(caffeineConfig());
+        if (factorialCacheLoader != null) {
+            CacheLoader<Long, BigInteger> loader = factorialCacheLoader;
+            cacheManager.setCacheLoader((key) -> loader.load((Long) key));
+        }
+        return cacheManager;
+    }
 
     @Bean
     public Caffeine<Object, Object> caffeineConfig() {
@@ -39,11 +53,4 @@ public class CaffeineCacheConfig {
                 .maximumSize(maximumSize);
     }
 
-    @Bean
-    public CaffeineCacheManager cacheManager(Caffeine<Object, Object> caffeine) {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager(cacheNames);
-        cacheManager.setCaffeine(caffeine);
-        log.info("Caffeine Cache Manager настроен с именами: {}", Arrays.toString(cacheNames));
-        return cacheManager;
-    }
 }

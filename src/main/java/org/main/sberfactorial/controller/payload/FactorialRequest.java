@@ -1,12 +1,18 @@
 package org.main.sberfactorial.controller.payload;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Validated
 public class FactorialRequest {
-    @JsonProperty("factorial_num")
-    @NotNull(message = "Число для вычисления факториала не предоставлено или ключ в JSON некорректен ('factorial_num')")
-    private Integer number;
+    @Min(1)
+    @Max(100)
+    private Long factorial_num;
 }
